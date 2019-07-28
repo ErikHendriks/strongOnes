@@ -78,47 +78,32 @@ sma30d1 = {}
 sma50d1 = {}
 sma100d1 = {}
 
-
 params = {'instruments':'AUD_CAD,AUD_CHF,AUD_JPY,AUD_NZD,AUD_USD,CAD_CHF,CAD_JPY,CHF_JPY,EUR_AUD,EUR_CAD,EUR_CHF,EUR_GBP,EUR_JPY,EUR_NZD,EUR_USD,GBP_AUD,GBP_CAD,GBP_CHF,GBP_JPY,GBP_NZD,GBP_USD,NZD_CAD,NZD_CHF,NZD_JPY,NZD_USD,NZD_USD,USD_CAD,USD_CHF,USD_JPY'}
 price = PricingStream(accountID=accountID,params=params)
 date = datetime.datetime.now()
 
-#for p in api.request(price):
-#   print(p)
 percentChangeDict = {}
 
-##r = positions.OpenPositions(accountID=accountID)
-##api.request(r)
-###print(r.response)
-##
-##for symbol in symbols:
-##  candle1 = InstrumentsCandles(instrument=symbol,params=ohlcm)
-##  candle2 = InstrumentsCandles(instrument=symbol,params=ohlcd)
-##  api.request(candle1)
-##  api.request(candle2)
-##
-### closem1 = float(candle1.response['candles'][0]['mid']['c'])
-### closed1 = float(candle2.response['candles'][0]['mid']['c'])
-### closed2 = float(candle2.response['candles'][1]['mid']['c'])
-##  openPrice = float(candle2.response['candles'][0]['mid']['o'])
-##  closePrice = float(candle2.response['candles'][0]['mid']['c'])
-##
-### diffToday = round(Decimal((closem1 - closed1) / closem1),5)
-### diffYesterday = round(Decimal((closed1 - closed2) / closed1),5)
-##
-### print(candle2.response['instrument'])
-### print(closePrice)
-### print(openPrice)
-##  if 'JPY' in candle2.response['instrument']:
-##      percentChangeDict[symbol] = round((closePrice - openPrice) / closePrice,3)
-##  else:
-##      percentChangeDict[symbol] = round((closePrice - openPrice) / closePrice,5)
-##
-###print(sorted(percentChangeDict.items(), key=lambda x: x[1], reverse=True))
+r = positions.OpenPositions(accountID=accountID)
+api.request(r)
+
+for symbol in symbols:
+    candle1 = InstrumentsCandles(instrument=symbol,params=ohlcm)
+    candle2 = InstrumentsCandles(instrument=symbol,params=ohlcd)
+    api.request(candle1)
+    api.request(candle2)
+
+    openPrice = float(candle2.response['candles'][0]['mid']['o'])
+    closePrice = float(candle2.response['candles'][0]['mid']['c'])
+
+    if 'JPY' in candle2.response['instrument']:
+        percentChangeDict[symbol] = round((closePrice - openPrice) / closePrice,3)
+    else:
+        percentChangeDict[symbol] = round((closePrice - openPrice) / closePrice,5)
 
 r = trades.TradesList(accountID=accountID,params=params)
 api.request(r)
-#print(json.dumps(r.response, indent=2))
+
 for trade in r.response['trades']:
     if trade['initialUnits'] == '-1000':
         print(trade['instrument'])
@@ -148,10 +133,9 @@ for trade in r.response['trades']:
         print('100d1 ',sma100d1[symbol])
         print('100d1 ',float(trade['price']))
         if sma30d1[symbol] > sma50d1[symbol] and\
-           sma50d1[symbol] > sma100d1[symbol] and\
-           sma30d1[symbol] <  float(trade['price']):
+           sma50d1[symbol] > sma100d1[symbol]:
             r = trades.TradeClose(accountID=accountID, tradeID=trade['id'])
-            print(r)
+            rv = api.request(r)
 
     elif trade['initialUnits'] == '1000':
         print(trade['instrument'])
@@ -181,35 +165,34 @@ for trade in r.response['trades']:
         print('100d1 ',sma100d1[symbol])
         print('100d1 ',float(trade['price']))
         if sma30d1[symbol] < sma50d1[symbol] and\
-           sma50d1[symbol] < sma100d1[symbol] and\
-           sma30d1[symbol] >  float(trade['price']):
+           sma50d1[symbol] < sma100d1[symbol]:
             r = trades.TradeClose(accountID=accountID, tradeID=trade['id'])
-            print(r)
+            rv = api.request(r)
 
-##i = 0
-##textList.append('Buy Orders:')
-##textList.append(' ')
-##while i < 5:
-##  buyOrder = MarketOrderRequest(instrument=sorted(percentChangeDict.items(), key=lambda x: x[1], reverse=True)[i][0],\
-##              units=1000,)
-##  r = orders.OrderCreate(accountID, data=buyOrder.data)
-### rv = api.request(r)
-##  textList.append(buyOrder)
-##  textList.append(' ')
-##  i+=1
-##
-##i = 0
-##textList.append('Sell Orders:')
-##textList.append(' ')
-##while i < 5:
-##  sellOrder = MarketOrderRequest(instrument=sorted(percentChangeDict.items(), key=lambda x: x[1])[i][0],\
-##              units=-1000,)
-##  r = orders.OrderCreate(accountID, data=sellOrder.data)
-### rv = api.request(r)
-##  textList.append(sellOrder)
-##  textList.append(' ')
-##  i+=1
-##
-##text = '\n'.join(map(str,textList))
-##subject = 'StrongOnes.py rapport at '+str(datetime.datetime.now())
-##sendEmail(text,subject)
+i = 0
+textList.append('Buy Orders:')
+textList.append(' ')
+while i < 7:
+    buyOrder = MarketOrderRequest(instrument=sorted(percentChangeDict.items(), key=lambda x: x[1], reverse=True)[i][0],\
+                units=1000,)
+    r = orders.OrderCreate(accountID, data=buyOrder.data)
+    rv = api.request(r)
+    textList.append(buyOrder)
+    textList.append(' ')
+    i+=1
+
+i = 0
+textList.append('Sell Orders:')
+textList.append(' ')
+while i < 7:
+    sellOrder = MarketOrderRequest(instrument=sorted(percentChangeDict.items(), key=lambda x: x[1])[i][0],\
+                units=-1000,)
+    r = orders.OrderCreate(accountID, data=sellOrder.data)
+    rv = api.request(r)
+    textList.append(sellOrder)
+    textList.append(' ')
+    i+=1
+
+text = '\n'.join(map(str,textList))
+subject = 'StrongOnes.py rapport at '+str(datetime.datetime.now())
+sendEmail(text,subject)
