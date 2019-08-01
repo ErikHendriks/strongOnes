@@ -60,6 +60,7 @@ accountID = conf[0]
 api = API(access_token = conf[1],\
                 environment = conf[2])
 
+#symbols = ['AUD_CAD','AUD_CHF','AUD_JPY','AUD_NZD','AUD_USD']
 symbols = ['AUD_CAD','AUD_CHF','AUD_JPY','AUD_NZD','AUD_USD',\
            'CAD_CHF','CAD_JPY',\
            'CHF_JPY',\
@@ -101,97 +102,89 @@ for symbol in symbols:
     else:
         percentChangeDict[symbol] = round((closePrice - openPrice) / closePrice,5)
 
+    sma30d1[symbol] = 0.0
+    candles = InstrumentsCandles(instrument=symbol,params=smaData30d1)
+    api.request(candles)
+    for close in candles.response['candles']:
+        sma30d1[symbol] += float(close['mid']['c'])
+    sma30d1[symbol] = sma30d1[symbol] / 30
+#   print('30d1  ',sma30d1[symbol])
+
+    sma50d1[symbol] = 0.0
+    candles = InstrumentsCandles(instrument=symbol,params=smaData50d1)
+    api.request(candles)
+    for close in candles.response['candles']:
+        sma50d1[symbol] += float(close['mid']['c'])
+    sma50d1[symbol] = sma50d1[symbol] / 50
+#   print('50d1  ',sma50d1[symbol])
+
+    sma100d1[symbol] = 0.0
+    candles = InstrumentsCandles(instrument=symbol,params=smaData100d1)
+    api.request(candles)
+    for close in candles.response['candles']:
+        sma100d1[symbol] += float(close['mid']['c'])
+    sma100d1[symbol] = sma100d1[symbol] / 100
+#   print('100d1 ',sma100d1[symbol])
+
+#print(sorted(percentChangeDict.items(), key=lambda x: x[1], reverse=True)[3][0])
 r = trades.TradesList(accountID=accountID,params=params)
 api.request(r)
 
 for trade in r.response['trades']:
     if trade['initialUnits'] == '-1000':
-        print(trade['instrument'])
         symbol = trade['instrument']
-        sma30d1[symbol] = 0.0
-        candles = InstrumentsCandles(instrument=symbol,params=smaData30d1)
-        api.request(candles)
-        for close in candles.response['candles']:
-            sma30d1[symbol] += float(close['mid']['c'])
-        sma30d1[symbol] = sma30d1[symbol] / 30
-        print('30d1  ',sma30d1[symbol])
-
-        sma50d1[symbol] = 0.0
-        candles = InstrumentsCandles(instrument=symbol,params=smaData50d1)
-        api.request(candles)
-        for close in candles.response['candles']:
-            sma50d1[symbol] += float(close['mid']['c'])
-        sma50d1[symbol] = sma50d1[symbol] / 50
-        print('50d1  ',sma50d1[symbol])
-
-        sma100d1[symbol] = 0.0
-        candles = InstrumentsCandles(instrument=symbol,params=smaData100d1)
-        api.request(candles)
-        for close in candles.response['candles']:
-            sma100d1[symbol] += float(close['mid']['c'])
-        sma100d1[symbol] = sma100d1[symbol] / 100
-        print('100d1 ',sma100d1[symbol])
-        print('100d1 ',float(trade['price']))
         if sma30d1[symbol] > sma50d1[symbol] and\
            sma50d1[symbol] > sma100d1[symbol]:
             r = trades.TradeClose(accountID=accountID, tradeID=trade['id'])
-            rv = api.request(r)
+#           rv = api.request(r)
 
     elif trade['initialUnits'] == '1000':
-        print(trade['instrument'])
         symbol = trade['instrument']
-        sma30d1[symbol] = 0.0
-        candles = InstrumentsCandles(instrument=symbol,params=smaData30d1)
-        api.request(candles)
-        for close in candles.response['candles']:
-            sma30d1[symbol] += float(close['mid']['c'])
-        sma30d1[symbol] = sma30d1[symbol] / 30
-        print('30d1  ',sma30d1[symbol])
-
-        sma50d1[symbol] = 0.0
-        candles = InstrumentsCandles(instrument=symbol,params=smaData50d1)
-        api.request(candles)
-        for close in candles.response['candles']:
-            sma50d1[symbol] += float(close['mid']['c'])
-        sma50d1[symbol] = sma50d1[symbol] / 50
-        print('50d1  ',sma50d1[symbol])
-
-        sma100d1[symbol] = 0.0
-        candles = InstrumentsCandles(instrument=symbol,params=smaData100d1)
-        api.request(candles)
-        for close in candles.response['candles']:
-            sma100d1[symbol] += float(close['mid']['c'])
-        sma100d1[symbol] = sma100d1[symbol] / 100
-        print('100d1 ',sma100d1[symbol])
-        print('100d1 ',float(trade['price']))
         if sma30d1[symbol] < sma50d1[symbol] and\
            sma50d1[symbol] < sma100d1[symbol]:
             r = trades.TradeClose(accountID=accountID, tradeID=trade['id'])
-            rv = api.request(r)
+#           rv = api.request(r)
 
 i = 0
+j = 0
+sortedReversed = sorted(percentChangeDict.items(), key=lambda x: x[1], reverse=True)
 textList.append('Buy Orders:')
 textList.append(' ')
-while i < 7:
-    buyOrder = MarketOrderRequest(instrument=sorted(percentChangeDict.items(), key=lambda x: x[1], reverse=True)[i][0],\
-                units=1000,)
-    r = orders.OrderCreate(accountID, data=buyOrder.data)
-    rv = api.request(r)
-    textList.append(buyOrder)
-    textList.append(' ')
-    i+=1
+while i < 3 or j < 6:
+    for symbol,price in sortedReversed:
+#       print(symbol)
+        if sma30d1[symbol] < sma50d1[symbol] and\
+           sma50d1[symbol] < sma100d1[symbol]:
+            buyOrder = MarketOrderRequest(instrument=symbol,\
+                        units=1000,)
+            r = orders.OrderCreate(accountID, data=buyOrder.data)
+            rv = api.request(r)
+            textList.append(buyOrder)
+            textList.append(' ')
+            i+=1
+            j+=1
+        else:
+            j+=1
 
 i = 0
+j = 0
+sortedNoReversed = sorted(percentChangeDict.items(), key=lambda x: x[1])
 textList.append('Sell Orders:')
 textList.append(' ')
-while i < 7:
-    sellOrder = MarketOrderRequest(instrument=sorted(percentChangeDict.items(), key=lambda x: x[1])[i][0],\
-                units=-1000,)
-    r = orders.OrderCreate(accountID, data=sellOrder.data)
-    rv = api.request(r)
-    textList.append(sellOrder)
-    textList.append(' ')
-    i+=1
+while i < 3 or j < 6:
+    for symbol,price in sortedNoReversed:
+        if sma30d1[symbol] > sma50d1[symbol] and\
+           sma50d1[symbol] > sma100d1[symbol]:
+            sellOrder = MarketOrderRequest(instrument=symbol,\
+                        units=-1000,)
+            r = orders.OrderCreate(accountID, data=sellOrder.data)
+            rv = api.request(r)
+            textList.append(sellOrder)
+            textList.append(' ')
+            i+=1
+            j+=1
+        else:
+            j+=1
 
 text = '\n'.join(map(str,textList))
 subject = 'StrongOnes.py rapport at '+str(datetime.datetime.now())
