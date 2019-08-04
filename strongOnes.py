@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import datetime
-import gnupg
 import json
 import logging
 import oandapyV20
@@ -9,7 +8,6 @@ import oandapyV20.endpoints.orders as orders
 import oandapyV20.endpoints.positions as positions
 import oandapyV20.endpoints.trades as trades
 import requests
-import smtplib
 import time
 import urllib3
 
@@ -20,36 +18,13 @@ from oandapyV20.endpoints.instruments import InstrumentsCandles
 from oandapyV20.endpoints.pricing import PricingStream
 from oandapyV20.exceptions import V20Error, StreamTerminated
 from requests.exceptions import ConnectionError
+from sendInfo import sendEmail
+from smas import SMA30d1,SMA50d1,SMA100d1
 
 logging.basicConfig(
         filename='/var/log/strongOnes.log',
         level=logging.DEBUG,
         format='%(asctime)s [%(levelname)s] %(name)s : %(message)s',)
-
-def sendEmail(text,subject):
-        '''
-        '''
-        try:
-                fingerprint = conf[3]
-                password = conf[4]
-                sender = conf[6]
-                reciever = conf[5]
-#               subject = 'Oanda v20 breakout test rapport at '+str(datetime.datetime.now())
-                gpg = gnupg.GPG(gnupghome='/etc/breakout/.gnupg')
-                text = str(gpg.encrypt(text,fingerprint))
-                mail = '''From: %s\nTo: %s\nSubject: %s\n\n%s
-                        ''' % (sender,reciever,subject,text)
-                server = smtplib.SMTP('smtp.gmail.com', 587)
-                server.starttls()
-                server.login(sender,password)
-#               server.set_debuglevel(1)
-                server.sendmail(sender, reciever, mail)
-                server.quit()
-        except Exception as e:
-#               print(e)
-                with open('/var/log/strongOnes.log', 'a') as LOG:
-                        LOG.write(str(datetime.datetime.now()) + ' sendEmail: {}\n'.format(e))
-                pass
 
 textList = []
 textList.append('Oanda v20 strongones rapport at '+str(datetime.datetime.now()))
@@ -102,29 +77,9 @@ for symbol in symbols:
     else:
         percentChangeDict[symbol] = round((closePrice - openPrice) / closePrice,5)
 
-    sma30d1[symbol] = 0.0
-    candles = InstrumentsCandles(instrument=symbol,params=smaData30d1)
-    api.request(candles)
-    for close in candles.response['candles']:
-        sma30d1[symbol] += float(close['mid']['c'])
-    sma30d1[symbol] = sma30d1[symbol] / 30
-#   print('30d1  ',sma30d1[symbol])
-
-    sma50d1[symbol] = 0.0
-    candles = InstrumentsCandles(instrument=symbol,params=smaData50d1)
-    api.request(candles)
-    for close in candles.response['candles']:
-        sma50d1[symbol] += float(close['mid']['c'])
-    sma50d1[symbol] = sma50d1[symbol] / 50
-#   print('50d1  ',sma50d1[symbol])
-
-    sma100d1[symbol] = 0.0
-    candles = InstrumentsCandles(instrument=symbol,params=smaData100d1)
-    api.request(candles)
-    for close in candles.response['candles']:
-        sma100d1[symbol] += float(close['mid']['c'])
-    sma100d1[symbol] = sma100d1[symbol] / 100
-#   print('100d1 ',sma100d1[symbol])
+    SMA30d1(symbol,sma30d1)
+    SMA50d1(symbol,sma50d1)
+    SMA100d1(symbol,sma100d1)
 
 #print(sorted(percentChangeDict.items(), key=lambda x: x[1], reverse=True)[3][0])
 r = trades.TradesList(accountID=accountID,params=params)
@@ -150,15 +105,19 @@ j = 0
 sortedReversed = sorted(percentChangeDict.items(), key=lambda x: x[1], reverse=True)
 textList.append('Buy Orders:')
 textList.append(' ')
-while i < 3 or j < 6:
+while not (i==5 or j==9):
     for symbol,price in sortedReversed:
+        if i==5 or j==9:
+            break
+        print('i',i)
+        print('j',j)
 #       print(symbol)
         if sma30d1[symbol] < sma50d1[symbol] and\
            sma50d1[symbol] < sma100d1[symbol]:
             buyOrder = MarketOrderRequest(instrument=symbol,\
                         units=1000,)
             r = orders.OrderCreate(accountID, data=buyOrder.data)
-            rv = api.request(r)
+#           rv = api.request(r)
             textList.append(buyOrder)
             textList.append(' ')
             i+=1
@@ -171,14 +130,18 @@ j = 0
 sortedNoReversed = sorted(percentChangeDict.items(), key=lambda x: x[1])
 textList.append('Sell Orders:')
 textList.append(' ')
-while i < 3 or j < 6:
+while not (i==5 or j==9):
     for symbol,price in sortedNoReversed:
+        if i==5 or j==9:
+            break
+        print('i',i)
+        print('j',j)
         if sma30d1[symbol] > sma50d1[symbol] and\
            sma50d1[symbol] > sma100d1[symbol]:
             sellOrder = MarketOrderRequest(instrument=symbol,\
                         units=-1000,)
             r = orders.OrderCreate(accountID, data=sellOrder.data)
-            rv = api.request(r)
+#           rv = api.request(r)
             textList.append(sellOrder)
             textList.append(' ')
             i+=1
