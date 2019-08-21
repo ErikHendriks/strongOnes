@@ -6,6 +6,11 @@ conf = [line.strip('\n') for line in open('/etc/breakout/conf.v20')]
 
 def sendEmail(text,subject):
     '''
+        Sending relevant information about initial buy/sell target prices as well as
+        stop loss and take profit prices, executed buy/sell orders, when all trades are
+        executed or allotted time has passed.
+        You need a sender email address with password, receiver email address
+        with fingerprint of public key.
     '''
     try:
         fingerprint = conf[3]
@@ -24,7 +29,7 @@ def sendEmail(text,subject):
         server.quit()
     except Exception as e:
 #       print(e)
-        with open('/var/log/strongOnes.log', 'a') as LOG:
+        with open('/var/log/sendInfo.log', 'a') as LOG:
                 LOG.write(str(datetime.datetime.now()) + ' sendEmail: {}\n'.format(e))
         pass
 

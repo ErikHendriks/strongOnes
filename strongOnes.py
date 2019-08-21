@@ -19,7 +19,7 @@ from oandapyV20.endpoints.pricing import PricingStream
 from oandapyV20.exceptions import V20Error, StreamTerminated
 from requests.exceptions import ConnectionError
 from sendInfo import sendEmail
-from smas import SMA30d1,SMA50d1,SMA100d1
+from smas import sma
 
 logging.basicConfig(
         filename='/var/log/strongOnes.log',
@@ -35,7 +35,6 @@ accountID = conf[0]
 api = API(access_token = conf[1],\
                 environment = conf[2])
 
-#symbols = ['AUD_CAD','AUD_CHF','AUD_JPY','AUD_NZD','AUD_USD']
 symbols = ['AUD_CAD','AUD_CHF','AUD_JPY','AUD_NZD','AUD_USD',\
            'CAD_CHF','CAD_JPY',\
            'CHF_JPY',\
@@ -44,80 +43,70 @@ symbols = ['AUD_CAD','AUD_CHF','AUD_JPY','AUD_NZD','AUD_USD',\
            'NZD_CAD','NZD_CHF','NZD_JPY','NZD_USD','NZD_USD',\
            'USD_CAD','USD_CHF','USD_JPY']
 
-ohlcm = {'count': 1,'granularity': 'M'}
 ohlcd = {'count': 2,'granularity': 'D'}
-
+params = {'instruments':'AUD_CAD,AUD_CHF,AUD_JPY,AUD_NZD,AUD_USD,CAD_CHF,CAD_JPY,CHF_JPY,EUR_AUD,EUR_CAD,EUR_CHF,EUR_GBP,EUR_JPY,EUR_NZD,EUR_USD,GBP_AUD,GBP_CAD,GBP_CHF,GBP_JPY,GBP_NZD,GBP_USD,NZD_CAD,NZD_CHF,NZD_JPY,NZD_USD,NZD_USD,USD_CAD,USD_CHF,USD_JPY'}
 smaData30d1 = {'count': 30,'granularity': 'D'}
 smaData50d1 = {'count': 50,'granularity': 'D'}
 smaData100d1 = {'count': 100,'granularity': 'D'}
 sma30d1 = {}
 sma50d1 = {}
 sma100d1 = {}
-
-params = {'instruments':'AUD_CAD,AUD_CHF,AUD_JPY,AUD_NZD,AUD_USD,CAD_CHF,CAD_JPY,CHF_JPY,EUR_AUD,EUR_CAD,EUR_CHF,EUR_GBP,EUR_JPY,EUR_NZD,EUR_USD,GBP_AUD,GBP_CAD,GBP_CHF,GBP_JPY,GBP_NZD,GBP_USD,NZD_CAD,NZD_CHF,NZD_JPY,NZD_USD,NZD_USD,USD_CAD,USD_CHF,USD_JPY'}
-price = PricingStream(accountID=accountID,params=params)
-date = datetime.datetime.now()
-
 percentChangeDict = {}
 
 r = positions.OpenPositions(accountID=accountID)
 api.request(r)
 
 for symbol in symbols:
-    candle1 = InstrumentsCandles(instrument=symbol,params=ohlcm)
-    candle2 = InstrumentsCandles(instrument=symbol,params=ohlcd)
-    api.request(candle1)
-    api.request(candle2)
+    candle = InstrumentsCandles(instrument=symbol,params=ohlcd)
+    api.request(candle)
 
-    openPrice = float(candle2.response['candles'][0]['mid']['o'])
-    closePrice = float(candle2.response['candles'][0]['mid']['c'])
+    openPrice = float(candle.response['candles'][0]['mid']['o'])
+    closePrice = float(candle.response['candles'][0]['mid']['c'])
 
-    if 'JPY' in candle2.response['instrument']:
+    if 'JPY' in candle.response['instrument']:
         percentChangeDict[symbol] = round((closePrice - openPrice) / closePrice,3)
     else:
         percentChangeDict[symbol] = round((closePrice - openPrice) / closePrice,5)
 
-    SMA30d1(symbol,sma30d1)
-    SMA50d1(symbol,sma50d1)
-    SMA100d1(symbol,sma100d1)
+    sma(symbol,sma30d1,smaData30d1)
+    sma(symbol,sma50d1,smaData50d1)
+    sma(symbol,sma100d1,smaData100d1)
 
-#print(sorted(percentChangeDict.items(), key=lambda x: x[1], reverse=True)[3][0])
 r = trades.TradesList(accountID=accountID,params=params)
 api.request(r)
 
 for trade in r.response['trades']:
-    if trade['initialUnits'] == '-1000':
-        symbol = trade['instrument']
-        if sma30d1[symbol] > sma50d1[symbol] and\
-           sma50d1[symbol] > sma100d1[symbol]:
-            r = trades.TradeClose(accountID=accountID, tradeID=trade['id'])
-#           rv = api.request(r)
+    if trade['initialUnits'] == '1000':
+#       symbol = trade['instrument']
+#       if sma30d1[symbol] < sma50d1[symbol] and\
+#          sma50d1[symbol] < sma100d1[symbol]:
+        r = trades.TradeClose(accountID=accountID, tradeID=trade['id'])
+        rv = api.request(r)
 
-    elif trade['initialUnits'] == '1000':
-        symbol = trade['instrument']
-        if sma30d1[symbol] < sma50d1[symbol] and\
-           sma50d1[symbol] < sma100d1[symbol]:
-            r = trades.TradeClose(accountID=accountID, tradeID=trade['id'])
-#           rv = api.request(r)
+    elif trade['initialUnits'] == '-1000':
+#       symbol = trade['instrument']
+#       if sma30d1[symbol] > sma50d1[symbol] and\
+#          sma50d1[symbol] > sma100d1[symbol]:
+        r = trades.TradeClose(accountID=accountID, tradeID=trade['id'])
+        rv = api.request(r)
 
 i = 0
 j = 0
 sortedReversed = sorted(percentChangeDict.items(), key=lambda x: x[1], reverse=True)
 textList.append('Buy Orders:')
 textList.append(' ')
-while not (i==5 or j==9):
+while not (i==4 or j==6):
     for symbol,price in sortedReversed:
-        if i==5 or j==9:
-            break
         print('i',i)
         print('j',j)
-#       print(symbol)
-        if sma30d1[symbol] < sma50d1[symbol] and\
-           sma50d1[symbol] < sma100d1[symbol]:
+        if i==4 or j==6:
+            break
+        if sma30d1[symbol] > sma50d1[symbol] and\
+           sma50d1[symbol] > sma100d1[symbol]:
             buyOrder = MarketOrderRequest(instrument=symbol,\
                         units=1000,)
             r = orders.OrderCreate(accountID, data=buyOrder.data)
-#           rv = api.request(r)
+            rv = api.request(r)
             textList.append(buyOrder)
             textList.append(' ')
             i+=1
@@ -130,18 +119,18 @@ j = 0
 sortedNoReversed = sorted(percentChangeDict.items(), key=lambda x: x[1])
 textList.append('Sell Orders:')
 textList.append(' ')
-while not (i==5 or j==9):
+while not (i==4 or j==6):
     for symbol,price in sortedNoReversed:
-        if i==5 or j==9:
-            break
         print('i',i)
         print('j',j)
-        if sma30d1[symbol] > sma50d1[symbol] and\
-           sma50d1[symbol] > sma100d1[symbol]:
+        if i==4 or j==6:
+            break
+        if sma30d1[symbol] < sma50d1[symbol] and\
+           sma50d1[symbol] < sma100d1[symbol]:
             sellOrder = MarketOrderRequest(instrument=symbol,\
                         units=-1000,)
             r = orders.OrderCreate(accountID, data=sellOrder.data)
-#           rv = api.request(r)
+            rv = api.request(r)
             textList.append(sellOrder)
             textList.append(' ')
             i+=1
